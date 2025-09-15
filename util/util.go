@@ -16,6 +16,47 @@ type FileEntry struct {
 	Info os.FileInfo
 }
 
+type DirBlock struct {
+	Path    string
+	Entries []FileEntry
+}
+
+func RecurseScan(cwd string, showAll bool) []DirBlock {
+	entries := CollectEntries(cwd, showAll)
+	var result []DirBlock
+
+	if len(entries) <= 1 {
+		return result
+	}
+
+	for _, e := range entries {
+
+		if e.Info.IsDir() {
+			subEntries := CollectEntries(e.Path, showAll)
+			result = append(result, DirBlock{Path: e.Path, Entries: subEntries})
+			result = append(result, RecurseScan(e.Path, showAll)...)
+		}
+	}
+
+	return result
+}
+
+func ShowOutput(cfg config.Config, dirsFirst bool, realDirSize bool, entries []FileEntry, recurse bool) {
+
+	if len(entries) == 0 {
+		return
+	}
+
+	SortEntries(entries, dirsFirst)
+
+	var rows [][]string
+	for _, e := range entries {
+		rows = append(rows, FormatEntry(e, realDirSize, cfg))
+	}
+
+	PrintTable(rows, recurse)
+}
+
 func CollectEntries(pattern string, showAll bool) []FileEntry {
 	paths := CollectPaths(pattern)
 	var entries []FileEntry
@@ -66,7 +107,7 @@ func FormatEntry(e FileEntry, realDirSize bool, cfg config.Config) []string {
 	return []string{perm, size, date, fullName}
 }
 
-func PrintTable(rows [][]string) {
+func PrintTable(rows [][]string, recurse bool) {
 	if len(rows) == 0 {
 		return
 	}
@@ -81,6 +122,9 @@ func PrintTable(rows [][]string) {
 	}
 
 	for _, row := range rows {
+		if recurse {
+			fmt.Print(" ")
+		}
 		for i, col := range row {
 			fmt.Print(ansi.PadString(col, colWidths[i]))
 			if i < len(row)-1 {

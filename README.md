@@ -13,6 +13,7 @@ lse
 * `-a` - *show hidden files*
 * `-d` - *display dirs first*
 * `-s` - *display real file/dir size* (makes command slower)
+* `-R` - *display recursively content directories*
 
 # license
 
