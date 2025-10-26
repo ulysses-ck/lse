@@ -2,8 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"lse/ansi"
 	"lse/config"
 	"lse/util"
 )
@@ -14,6 +12,7 @@ var (
 	showAll     bool
 	realDirSize bool
 	recurse     bool
+	showTree    bool
 )
 
 func init() {
@@ -22,6 +21,7 @@ func init() {
 	flag.BoolVar(&showAll, "a", false, "show hidden files")
 	flag.BoolVar(&realDirSize, "s", false, "show real dir size")
 	flag.BoolVar(&recurse, "R", false, "display recursively content directories")
+	flag.BoolVar(&showTree, "t", false, "shows a tree structure")
 	flag.Parse()
 }
 
@@ -33,19 +33,10 @@ func main() {
 
 	cfg := config.LoadConfig(configFile)
 
-	entries := util.CollectEntries(pattern, showAll)
-	util.ShowOutput(cfg, dirsFirst, realDirSize, entries, false)
-
-	if recurse {
-		fmt.Println()
-
-		subEntries := util.RecurseScan(pattern, showAll)
-
-		for _, sl := range subEntries {
-			path := fmt.Sprintf(" %s%s %s/%s", cfg.FileTypes.Directory, cfg.Icons.Directory, sl.Path, ansi.Reset)
-			fmt.Println(path)
-			util.ShowOutput(cfg, dirsFirst, realDirSize, sl.Entries, recurse)
-			fmt.Println()
-		}
+	if showTree {
+		util.ShowOutput(cfg, dirsFirst, realDirSize, nil, recurse, showTree, pattern, showAll)
+	} else {
+		entries := util.CollectEntries(pattern, showAll)
+		util.ShowOutput(cfg, dirsFirst, realDirSize, entries, recurse, showTree, pattern, showAll)
 	}
 }
