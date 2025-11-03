@@ -14,6 +14,7 @@ lse
 * `-d` - *display dirs first*
 * `-s` - *display real file/dir size* (makes command slower)
 * `-R` - *display recursively content directories*
+* `-t` - *display files as a tree*
 
 # license
 

@@ -21,6 +21,58 @@ type DirBlock struct {
 	Entries []FileEntry
 }
 
+type TreeEntry struct {
+	FileEntry
+	Prefix string
+}
+
+func BuildPrefix(isLastAncestor []bool, isLastCurrent bool) string {
+	var prefix string
+	for _, isLast := range isLastAncestor {
+		if isLast {
+			prefix += "    "
+		} else {
+			prefix += "│   "
+		}
+	}
+
+	if len(isLastAncestor) > 0 || len(prefix) > 0 {
+		if isLastCurrent {
+			prefix += "└── "
+		} else {
+			prefix += "├── "
+		}
+	}
+
+	return prefix
+}
+
+func BuildTreeEntries(cwd string, isLastAncestor []bool, showAll bool, dirsFirst bool) []TreeEntry {
+	var treeEntries []TreeEntry
+
+	entries := CollectEntries(cwd, showAll)
+	SortEntries(entries, dirsFirst)
+
+	for i, e := range entries {
+		isLast := (i == len(entries)-1)
+
+		prefix := BuildPrefix(isLastAncestor, isLast)
+
+		treeEntries = append(treeEntries, TreeEntry{
+			FileEntry: e,
+			Prefix:    prefix,
+		})
+
+		if e.Info.IsDir() {
+			nextIsLastAncestor := append(isLastAncestor, isLast)
+			subEntries := BuildTreeEntries(e.Path, nextIsLastAncestor, showAll, dirsFirst)
+			treeEntries = append(treeEntries, subEntries...)
+		}
+	}
+
+	return treeEntries
+}
+
 func RecurseScan(cwd string, showAll bool) []DirBlock {
 	entries := CollectEntries(cwd, showAll)
 	var result []DirBlock
@@ -41,7 +93,26 @@ func RecurseScan(cwd string, showAll bool) []DirBlock {
 	return result
 }
 
-func ShowOutput(cfg config.Config, dirsFirst bool, realDirSize bool, entries []FileEntry, recurse bool) {
+func ShowOutput(cfg config.Config, dirsFirst bool, realDirSize bool, entries []FileEntry, recurse bool, showTree bool, cwd string, showAll bool) {
+	if showTree {
+		// Modo ÁRBOL: Recolecta toda la estructura con prefijos
+		// Nota: El modo árbol implica recursión, por lo que 'recurse' es irrelevante aquí.
+		treeEntries := BuildTreeEntries(cwd, []bool{}, showAll, dirsFirst)
+
+		if len(treeEntries) == 0 {
+			fmt.Printf("No entries found in '%s'\n", cwd)
+			return
+		}
+
+		fmt.Println(cwd)
+
+		var rows [][]string
+		for _, te := range treeEntries {
+			rows = append(rows, FormatEntry(te.FileEntry, realDirSize, cfg, true, te.Prefix))
+		}
+		PrintTable(rows, recurse, true)
+		return
+	}
 
 	if len(entries) == 0 {
 		return
@@ -51,10 +122,10 @@ func ShowOutput(cfg config.Config, dirsFirst bool, realDirSize bool, entries []F
 
 	var rows [][]string
 	for _, e := range entries {
-		rows = append(rows, FormatEntry(e, realDirSize, cfg))
+		rows = append(rows, FormatEntry(e, realDirSize, cfg, false, ""))
 	}
 
-	PrintTable(rows, recurse)
+	PrintTable(rows, recurse, false)
 }
 
 func CollectEntries(pattern string, showAll bool) []FileEntry {
@@ -90,7 +161,13 @@ func SortEntries(entries []FileEntry, dirsFirst bool) {
 	})
 }
 
-func FormatEntry(e FileEntry, realDirSize bool, cfg config.Config) []string {
+func FormatEntry(e FileEntry, realDirSize bool, cfg config.Config, showTree bool, prefix string) []string {
+	fullName := color.Name(e.Info.Name(), e.Info.Mode(), cfg.Icons, cfg.FileTypes)
+
+	if showTree {
+		return []string{prefix + fullName}
+	}
+
 	perm := color.Permissions(e.Info.Mode().String(), cfg.Permissions)
 
 	var sizeBytes int64
@@ -102,13 +179,19 @@ func FormatEntry(e FileEntry, realDirSize bool, cfg config.Config) []string {
 	size := color.Size(sizeBytes, cfg.Size)
 
 	date := color.Date(e.Info.ModTime(), cfg.Date)
-	fullName := color.Name(e.Info.Name(), e.Info.Mode(), cfg.Icons, cfg.FileTypes)
 
 	return []string{perm, size, date, fullName}
 }
 
-func PrintTable(rows [][]string, recurse bool) {
+func PrintTable(rows [][]string, recurse bool, showTree bool) {
 	if len(rows) == 0 {
+		return
+	}
+
+	if showTree && len(rows[0]) == 1 {
+		for _, row := range rows {
+			fmt.Println(row[0])
+		}
 		return
 	}
 
@@ -126,9 +209,12 @@ func PrintTable(rows [][]string, recurse bool) {
 			fmt.Print(" ")
 		}
 		for i, col := range row {
-			fmt.Print(ansi.PadString(col, colWidths[i]))
+			format := ansi.PadString(col, colWidths[i])
 			if i < len(row)-1 {
+				fmt.Printf("%-*s", colWidths[i], format)
 				fmt.Print(" ")
+			} else {
+				fmt.Print(format)
 			}
 		}
 		fmt.Println()
