@@ -1,0 +1,45 @@
+name: build and release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Build binaries (Windows & Linux 64-bit)
+        run: |
+          mkdir -p dist
+          echo "Building for Linux amd64..."
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o dist/lse-linux-amd64 -a -ldflags '-extldflags "-static"' .
+          echo "Building for Windows amd64..."
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o dist/lse-windows-amd64.exe -a -ldflags '-extldflags "-static"' .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Includes binaries for:
+            - Windows (amd64)
+            - Linux (amd64)
+          files: |
+            dist/lse-linux-amd64
+            dist/lse-windows-amd64.exe
