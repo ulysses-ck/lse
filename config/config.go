@@ -171,7 +171,7 @@ func DefaultConfig() Config {
 			Typescript: "",
 			Javascript: "",
 			Nix:        "󱄅",
-			Rust:       "",
+			Rust:       "", // fr
 			Python:     "",
 			Java:       "",
 			CSharp:     "󰌛",
